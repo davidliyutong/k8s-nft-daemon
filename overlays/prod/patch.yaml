@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nft-firewall
+spec:
+  template:
+    spec:
+      containers:
+        - name: nft-firewall
+          # ── Table name — must match the table declared in rules.nft ──────────
+          env:
+            - name: NFT_TABLE
+              value: "k8s_pod_nfs_guard"
+
+          # ── Resource constraints ─────────────────────────────────────────────
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+
+      # ── Node selection ────────────────────────────────────────────────────────
+      # Uncomment to limit which nodes run this DaemonSet pod.
+      # Remove or leave empty to deploy on ALL nodes (default DaemonSet behavior).
+      # nodeSelector:
+      #   kubernetes.io/os: linux
+      #   node-role.kubernetes.io/worker: "true"
+
+      # ── Tolerations ───────────────────────────────────────────────────────────
+      # Tolerate control-plane taints so the firewall runs on every node,
+      # including masters. Remove if you only want worker nodes covered.
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule

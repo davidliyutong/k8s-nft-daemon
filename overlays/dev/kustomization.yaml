@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# ── Namespace ──────────────────────────────────────────────────────────────────
+namespace: nft-firewall-dev
+
+resources:
+  - ../../base
+
+# ── Image reference ────────────────────────────────────────────────────────────
+# Change newTag to pin a specific release, or newName to use a private mirror.
+images:
+  - name: ghcr.io/davidliyutong/k8s-nft-daemonset
+    # newName: ""
+    newTag: "latest"
+
+# ── nftables rules — edit rules.nft in this directory ─────────────────────────
+# behavior: merge replaces only rules.nft; entrypoint.sh stays baked into the image.
+configMapGenerator:
+  - name: nft-config
+    behavior: merge
+    files:
+      - rules.nft
+
+patches:
+  # Single patch file — edit patch.yaml to tune resources, node placement.
+  - path: patch.yaml
+    target:
+      kind: DaemonSet
+      name: nft-firewall

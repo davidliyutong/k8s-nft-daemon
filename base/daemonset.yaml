@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nft-firewall
+  labels:
+    app.kubernetes.io/name: nft-firewall
+    app.kubernetes.io/component: firewall
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nft-firewall
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nft-firewall
+        app.kubernetes.io/component: firewall
+    spec:
+      serviceAccountName: nft-firewall
+      # Run in the host network namespace so nft commands affect
+      # the node's kernel netfilter tables, not the pod's.
+      hostNetwork: true
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: nft-firewall
+          image: ghcr.io/davidliyutong/k8s-nft-daemonset:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            # Name of the nftables table managed by this DaemonSet.
+            # Must match the table name declared in rules.nft.
+            - name: NFT_TABLE
+              value: "nft-custom"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nft/rules.nft
+              subPath: rules.nft
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            # hostNetwork alone is not enough — NET_ADMIN is required to
+            # create / modify nftables tables in the host network namespace.
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_ADMIN
+                - NET_RAW
+      volumes:
+        - name: config
+          configMap:
+            name: nft-config

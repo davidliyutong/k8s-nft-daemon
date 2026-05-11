@@ -1,0 +1,41 @@
+#
+# rules.nft — base nftables rules (pass-through, no restrictions)
+#
+# Applied atomically: the table named by NFT_TABLE (default: nft-custom) is
+# deleted and then recreated from this file on every pod start.  Running the
+# DaemonSet multiple times always converges to the same ruleset — idempotent.
+#
+# Customise per environment: create an overlay with a replacement rules.nft.
+# The table name here MUST match the NFT_TABLE env var in the DaemonSet
+# (or its overlay patch).
+#
+
+# ── Address family ────────────────────────────────────────────────────────────
+# "inet" covers both IPv4 and IPv6 traffic with a single set of rules.
+table inet nft-custom {
+
+    # ── Outbound traffic from this node ───────────────────────────────────────
+    chain output {
+        type filter hook output priority filter;
+        policy accept;
+
+        # Add rules below to filter traffic leaving this node.
+        # Rules are evaluated top-to-bottom; first match wins.
+        #
+        # Examples:
+        #   ip  daddr 192.0.2.0/24  drop  comment "block TEST-NET-1"
+        #   ip6 daddr 2001:db8::/32 drop  comment "block documentation range"
+    }
+
+    # ── Forwarded traffic (pod-to-external) ───────────────────────────────────
+    chain forward {
+        type filter hook forward priority filter;
+        policy accept;
+
+        # Add rules below to filter traffic forwarded through this node
+        # (i.e. originating from pods and routed to external destinations).
+        #
+        # Examples:
+        #   ip daddr 192.0.2.0/24 drop comment "block TEST-NET-1 from pods"
+    }
+}

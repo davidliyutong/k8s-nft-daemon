@@ -1,0 +1,78 @@
+name: Publish Docker image
+
+on:
+  # ── Manual trigger ──────────────────────────────────────────────────────────
+  # Run from Actions → "Publish Docker image" → "Run workflow".
+  # Optionally supply an extra tag (e.g. "v1.0.0-rc1"); "latest" is always pushed.
+  workflow_dispatch:
+    inputs:
+      extra_tag:
+        description: 'Extra image tag to push in addition to "latest" (e.g. v1.0.0-rc1). Leave blank to push only "latest".'
+        required: false
+        default: ''
+
+  # ── Release trigger ─────────────────────────────────────────────────────────
+  # Fires when a GitHub Release is published (not draft, not pre-release).
+  # Tags pushed: semver variants (1.2.3, 1.2) + latest.
+  release:
+    types: [published]
+
+env:
+  IMAGE: ghcr.io/davidliyutong/k8s-nft-daemonset
+
+jobs:
+  build-and-push:
+    name: Build & push (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Multi-arch support ──────────────────────────────────────────────────
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Registry login ──────────────────────────────────────────────────────
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Tag strategy ────────────────────────────────────────────────────────
+      # release:            v1.2.3 → 1.2.3, 1.2, latest
+      # workflow_dispatch:  always latest; extra_tag when provided
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            # Semver tags from release name (e.g. "v1.2.3" → "1.2.3", "1.2")
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            # "latest" on every trigger
+            type=raw,value=latest
+            # Extra tag supplied via workflow_dispatch input
+            type=raw,value=${{ github.event.inputs.extra_tag }},enable=${{ github.event.inputs.extra_tag != '' }}
+
+      # ── Build & push ─────────────────────────────────────────────────────────
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Layer cache via GitHub Actions cache — speeds up repeat builds.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

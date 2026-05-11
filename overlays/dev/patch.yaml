@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nft-firewall
+spec:
+  template:
+    spec:
+      containers:
+        - name: nft-firewall
+          # ── Resource constraints ─────────────────────────────────────────────
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+
+      # ── Node selection ────────────────────────────────────────────────────────
+      # Uncomment and set labels to restrict which nodes run this DaemonSet pod.
+      # nodeSelector:
+      #   kubernetes.io/os: linux
+      #   node-role.kubernetes.io/worker: "true"
+
+      # ── Tolerations ───────────────────────────────────────────────────────────
+      # tolerations:
+      #   - operator: Exists   # tolerate all taints (run on every node)

@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nft-firewall
+spec:
+  template:
+    spec:
+      containers:
+        - name: nft-firewall
+          # ── Resource constraints ─────────────────────────────────────────────
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+
+          # ── Environment overrides ────────────────────────────────────────────
+          # Uncomment to enable periodic rule re-apply (useful if other tools
+          # may flush nftables rules, e.g. firewalld restarts).
+          # env:
+          #   - name: NFT_TABLE
+          #     value: "nft-custom"       # must match table name in rules.nft
+          #   - name: REAPPLY_INTERVAL
+          #     value: "300"              # re-apply every 5 minutes
+
+      # ── Node selection ────────────────────────────────────────────────────────
+      # Pin pods to nodes with a specific label.
+      # Remove this block to deploy on ALL nodes (default DaemonSet behavior).
+      # nodeSelector:
+      #   kubernetes.io/os: linux
+      #   your-label-key: your-label-value
+
+      # ── Tolerations ───────────────────────────────────────────────────────────
+      # tolerations:
+      #   - key: node-role.kubernetes.io/control-plane
+      #     operator: Exists
+      #     effect: NoSchedule
+      #   - operator: Exists    # tolerate ALL taints — run on every node

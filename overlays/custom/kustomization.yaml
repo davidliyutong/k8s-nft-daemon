@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Copy this overlay to create a new environment.                         ║
+# ║  All tunable settings are in this file and patch.yaml.                  ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+# ── 1. Namespace ───────────────────────────────────────────────────────────────
+# The namespace is created automatically (base/namespace.yaml is patched).
+namespace: nft-firewall-custom
+
+resources:
+  - ../../base
+
+# ── 2. Image reference ─────────────────────────────────────────────────────────
+images:
+  - name: ghcr.io/davidliyutong/k8s-nft-daemonset
+    # newName: ""
+    newTag: "latest"
+    # Pin digest for reproducibility (recommended for production):
+    # digest: "sha256:..."
+
+# ── 3. nftables rules — edit rules.nft in this directory ──────────────────────
+# behavior: merge replaces only rules.nft; entrypoint.sh stays baked into the image.
+configMapGenerator:
+  - name: nft-config
+    behavior: merge
+    files:
+      - rules.nft
+
+patches:
+  # ── 4. Resources, node placement — edit patch.yaml ────────────────────────
+  - path: patch.yaml
+    target:
+      kind: DaemonSet
+      name: nft-firewall

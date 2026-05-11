@@ -1,0 +1,19 @@
+#
+# rules.passthrough.nft — no restrictions, table defined for consistency
+#
+# Use this as a starting point or to temporarily disable all blocking
+# while keeping the DaemonSet running.
+#
+
+table inet nft-custom {
+
+    chain output {
+        type filter hook output priority filter;
+        policy accept;
+    }
+
+    chain forward {
+        type filter hook forward priority filter;
+        policy accept;
+    }
+}

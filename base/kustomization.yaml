@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nft-firewall
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - daemonset.yaml
+
+configMapGenerator:
+  # nft-config: nftables rules — replace per overlay using behavior: merge.
+  # Any change to rules.nft triggers a rolling pod restart via hash suffix.
+  - name: nft-config
+    files:
+      - rules.nft
+
+generatorOptions:
+  # Hash suffix is appended to the ConfigMap name and propagated to the
+  # DaemonSet volume reference automatically — pods roll on any config change.
+  disableNameSuffixHash: false
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: nft-firewall
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: true

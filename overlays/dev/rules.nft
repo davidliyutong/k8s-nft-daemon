@@ -1,0 +1,19 @@
+#
+# rules.nft — dev overlay (pass-through, no restrictions)
+#
+# No blocking rules. Useful for verifying the DaemonSet deploys correctly
+# before rolling out production rules.
+#
+
+table inet nft-custom {
+
+    chain output {
+        type filter hook output priority filter;
+        policy accept;
+    }
+
+    chain forward {
+        type filter hook forward priority filter;
+        policy accept;
+    }
+}

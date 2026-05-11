@@ -1,0 +1,24 @@
+#
+# rules.nft — custom overlay template (pass-through, no restrictions)
+#
+# Replace the contents of this file with your site-specific nftables rules.
+# The table name (nft-custom) must match the NFT_TABLE env var in patch.yaml
+# (or in the base DaemonSet if not overridden).
+#
+
+table inet nft-custom {
+
+    chain output {
+        type filter hook output priority filter;
+        policy accept;
+
+        # Add your outbound rules here.
+    }
+
+    chain forward {
+        type filter hook forward priority filter;
+        policy accept;
+
+        # Add your forward rules here.
+    }
+}
