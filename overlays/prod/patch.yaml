@@ -12,6 +12,12 @@ spec:
             - name: NFT_TABLE
               value: "k8s_pod_nfs_guard"
 
+          # ── Image pull policy ────────────────────────────────────────────────
+          # IfNotPresent (default): use cached image if present on the node.
+          # Always:                 re-pull on every pod start (use with mutable tags).
+          # Never:                  require image to be pre-loaded on the node.
+          # imagePullPolicy: IfNotPresent
+
           # ── Resource constraints ─────────────────────────────────────────────
           resources:
             requests:

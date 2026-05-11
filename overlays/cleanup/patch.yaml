@@ -21,6 +21,9 @@ spec:
                 || echo "[nft-cleanup] Table not present — nothing to do."
               sleep infinity
 
+          # ── Image pull policy ────────────────────────────────────────────────
+          # imagePullPolicy: IfNotPresent
+
           # ── Table name — must match the overlay that was running ──────────────
           env:
             - name: NFT_TABLE

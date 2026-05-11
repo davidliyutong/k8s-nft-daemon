@@ -7,6 +7,12 @@ spec:
     spec:
       containers:
         - name: nft-firewall
+          # ── Image pull policy ────────────────────────────────────────────────
+          # IfNotPresent (default): use cached image if present on the node.
+          # Always:                 re-pull on every pod start (use with mutable tags).
+          # Never:                  require image to be pre-loaded on the node.
+          # imagePullPolicy: IfNotPresent
+
           # ── Resource constraints ─────────────────────────────────────────────
           resources:
             requests:
