@@ -21,6 +21,7 @@ table inet k8s_pod_nfs_guard {
   }
   set nfs_servers {
     type ipv4_addr
+    flags interval
     elements = { 192.168.0.0/24 }
   }
   chain block_pod_to_nfs {
