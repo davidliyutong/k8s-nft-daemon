@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nft-firewall
+spec:
+  template:
+    spec:
+      containers:
+        - name: nft-firewall
+          # ── Cleanup command ───────────────────────────────────────────────────
+          # Overrides the image ENTRYPOINT.  Deletes the managed table once on
+          # pod start, then sleeps so the DaemonSet stays Running (no restart
+          # loop).  Pod deletion (step 5 of the workflow) triggers the preStop
+          # hook and SIGTERM handler, both of which are no-ops here.
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "[nft-cleanup] Removing table inet ${NFT_TABLE} ..."
+              nft delete table inet "${NFT_TABLE}" 2>/dev/null \
+                && echo "[nft-cleanup] Done." \
+                || echo "[nft-cleanup] Table not present — nothing to do."
+              sleep infinity
+
+          # ── Table name — must match the overlay that was running ──────────────
+          env:
+            - name: NFT_TABLE
+              value: "nft-custom"   # ← change to match your overlay (e.g. k8s_pod_nfs_guard)
+
+      # ── Node selection — copy from the overlay being cleaned up ───────────────
+      # The cleanup pod must reach the same nodes as the original DaemonSet.
+      # nodeSelector:
+      #   node-feature/nft-daemon: "true"
+
+      # ── Tolerations — copy from the overlay being cleaned up ─────────────────
+      # tolerations:
+      #   - key: node-role.kubernetes.io/control-plane
+      #     operator: Exists
+      #     effect: NoSchedule
+      #   - key: node-role.kubernetes.io/master
+      #     operator: Exists
+      #     effect: NoSchedule

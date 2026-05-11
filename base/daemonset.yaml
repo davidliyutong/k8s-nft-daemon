@@ -34,6 +34,16 @@ spec:
             # Must match the table name declared in rules.nft.
             - name: NFT_TABLE
               value: "nft-custom"
+          lifecycle:
+            preStop:
+              # Runs BEFORE SIGTERM is sent — removes the managed table
+              # synchronously while the container is still alive.
+              # The SIGTERM trap in entrypoint.sh then runs as a no-op.
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - nft delete table inet "${NFT_TABLE:-nft-custom}" 2>/dev/null || true
           volumeMounts:
             - name: config
               mountPath: /etc/nft/rules.nft

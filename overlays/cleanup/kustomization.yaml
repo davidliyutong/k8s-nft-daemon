@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Cleanup overlay — removes nftables rules from every node.              ║
+# ║                                                                         ║
+# ║  Use when rules were NOT cleaned up by a normal `kubectl delete`        ║
+# ║  (e.g. after a node crash, SIGKILL, or accidental DaemonSet deletion).  ║
+# ║                                                                         ║
+# ║  Workflow:                                                               ║
+# ║    1. Set namespace below to match the environment you are cleaning.    ║
+# ║    2. Edit patch.yaml: set NFT_TABLE and copy nodeSelector/tolerations  ║
+# ║       from the overlay that was running.                                ║
+# ║    3. kubectl apply -k overlays/cleanup                                 ║
+# ║    4. kubectl rollout status ds/nft-firewall -n <namespace>             ║
+# ║    5. kubectl delete -k overlays/cleanup                                ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+
+# ── 1. Set this to the namespace of the deployment being cleaned up ────────────
+namespace: nft-firewall   # e.g. nft-firewall-dev, nft-firewall
+
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/davidliyutong/k8s-nft-daemonset
+    newTag: "latest"
+
+patches:
+  - path: patch.yaml
+    target:
+      kind: DaemonSet
+      name: nft-firewall

@@ -16,6 +16,9 @@ Each pod runs on a node in the host network namespace, applies a named nftables 
 │   ├── entrypoint.sh            # Pod startup script (apply rules, trap SIGTERM)
 │   └── rules.nft                # Default rules — pass-through, no restrictions
 └── overlays/
+    ├── cleanup/                 # Emergency cleanup — removes rules when normal delete fails
+    │   ├── kustomization.yaml   # ← set namespace to match the environment being cleaned
+    │   └── patch.yaml           # ← set NFT_TABLE, nodeSelector, tolerations to match
     ├── custom/                  # Template — copy this to create a new environment
     │   ├── kustomization.yaml   # ← namespace + image ref
     │   ├── patch.yaml           # ← resources, nodeSelector, tolerations
@@ -51,7 +54,9 @@ kubectl kustomize overlays/prod
    - Installs `nft` via `apk` if the image does not already provide it.
    - Deletes the managed table (`inet nft-custom` by default) if it exists — this removes any stale rules from a previous run.
    - Loads the fresh ruleset from `/etc/nft/rules.nft`.
-4. On pod deletion or node drain (SIGTERM), the script removes the table, leaving the node in its original state.
+4. On pod deletion or node drain, cleanup happens in two stages:
+   - The `preStop` lifecycle hook runs **synchronously** before SIGTERM, deleting the managed table while the container is still healthy.
+   - Then SIGTERM is sent; the trap handler in `entrypoint.sh` attempts the same deletion as a no-op fallback.
 
 ### Idempotency
 
@@ -167,14 +172,47 @@ To run on **all** nodes including control-plane, remove `nodeSelector` and add t
 | Overlay | Namespace | nodeSelector | Tolerations | Rules |
 |---------|-----------|--------------|-------------|-------|
 | dev | nft-firewall-dev | none (all nodes) | none | pass-through |
-| prod | nft-firewall | none (all nodes) | control-plane + master | bogon block |
+| prod | nft-firewall | `node-feature/nft-daemon=true` | control-plane + master | NFS guard |
 | custom | nft-firewall-custom | template (commented) | template (commented) | pass-through template |
+| cleanup | configurable | configurable | configurable | _(no rules — removes table)_ |
+
+## Removing the deployment
+
+### Normal removal
+
+```bash
+kubectl delete -k overlays/prod
+```
+
+On deletion each pod goes through:
+1. **preStop hook** — `nft delete table inet <NFT_TABLE>` runs synchronously.
+2. **SIGTERM** — the trap handler in `entrypoint.sh` retries the deletion (no-op if already gone).
+3. Pod exits; the node's nftables are restored.
+
+### Emergency cleanup (rules stuck after crash / SIGKILL)
+
+If pods were killed without graceful shutdown (node crash, OOM kill, `kubectl delete --force`), the nftables table may remain on the node.  Use the cleanup overlay to remove it:
+
+```bash
+# 1. Edit overlays/cleanup/kustomization.yaml — set namespace to match the dead deployment.
+# 2. Edit overlays/cleanup/patch.yaml — set NFT_TABLE and copy nodeSelector/tolerations.
+# 3. Deploy the cleanup DaemonSet (deletes the table on start, then sleeps).
+kubectl apply -k overlays/cleanup
+
+# 4. Wait for a Running pod on every affected node.
+kubectl rollout status daemonset/nft-firewall -n <namespace>
+
+# 5. Delete the cleanup DaemonSet (preStop hook runs, which is a no-op).
+kubectl delete -k overlays/cleanup
+```
+
+The cleanup DaemonSet deliberately sleeps after the table deletion so it stays `Running` without restart-looping, and so that step 5 triggers the standard preStop + SIGTERM path.
 
 ## Architecture Notes
 
 - **hostNetwork: true** — pods share the host network namespace; `nft` commands affect the node's kernel netfilter tables directly.
 - **CAP_NET_ADMIN** — only the minimum capability required for nftables is added; `privileged: true` is not needed.
-- **Named table isolation** — all rules live in `inet nft-custom` (configurable).  Other nftables tables on the host are never touched.
-- **Clean teardown** — SIGTERM handling in `entrypoint.sh` removes the table before the pod exits, so node firewall state is always restored on DaemonSet deletion or rollout.
+- **Named table isolation** — all rules live in a single named table (default `inet nft-custom`).  Other nftables tables on the host are never touched.
+- **Two-stage teardown** — the `preStop` lifecycle hook removes the table synchronously before SIGTERM arrives; the SIGTERM trap in `entrypoint.sh` is a belt-and-suspenders fallback.
 - **Rolling update** — `maxUnavailable: 1` on the DaemonSet update strategy keeps impact to one node at a time during rollouts.
-- **Image** — [`alpine:3.21`](https://hub.docker.com/_/alpine) from Docker Hub.  `nftables` is installed via `apk` on first start if not already present in the image.  Pin a digest in production.
+- **Image** — `ghcr.io/davidliyutong/k8s-nft-daemonset` built from this repo's `Dockerfile` via the `publish` GitHub Actions workflow. Pin a digest in production.
