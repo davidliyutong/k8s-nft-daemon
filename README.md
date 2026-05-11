@@ -1,4 +1,4 @@
-# idekube-outbound-nft-firewall
+# k8s-nft-daemon
 
 A Kubernetes deployment project for enforcing **node-level nftables firewall rules** via a DaemonSet, managed with Kustomize.
 
